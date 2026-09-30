@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatINR, formatPercent } from "@/lib/utils";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import {
   TrendingUp,
   ShoppingCart,
@@ -11,7 +12,6 @@ import {
   Sparkles,
   Truck,
   CheckCircle2,
-  Clock,
   Layers,
 } from "lucide-react";
 
@@ -171,6 +171,11 @@ export default async function DashboardPage() {
             Review Supplier Queue →
           </Link>
         </div>
+      )}
+
+      {/* Revenue / Profit Chart */}
+      {metrics.length > 0 && (
+        <RevenueChart data={metrics} />
       )}
 
       {/* Top Products & Unit Economics Table */}

@@ -15,6 +15,7 @@ import {
   Layers,
   CheckCircle2,
   ExternalLink,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,9 +40,10 @@ const navigation = [
     ],
   },
   {
-    title: "ANALYTICS",
+    title: "ANALYTICS & AUTOMATION",
     items: [
       { name: "Profitability Analytics", href: "/analytics", icon: Layers },
+      { name: "Automation & Audit Log", href: "/automation", icon: Zap },
     ],
   },
   {
