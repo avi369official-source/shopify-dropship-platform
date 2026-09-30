@@ -1,0 +1,300 @@
+// Prisma Schema for Shopify Dropshipping Operating System
+// IndiaMART + Shopify + Meta Integration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id          String   @id @default(cuid())
+  domain      String   @unique
+  name        String
+  currency    String   @default("INR")
+  accessToken String?
+  isActive    Boolean  @default(true)
+  settingsJson String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Product {
+  id               String            @id @default(cuid())
+  title            String
+  slug             String            @unique
+  description      String?
+  category         String            @default("General")
+  tags             String?           // Comma separated
+  // Status: DISCOVERED, RESEARCHING, SUPPLIER_VERIFIED, SAMPLE_TESTED, READY_TO_TEST, AD_TESTING, PROMISING, VALIDATED, SCALE, REJECTED
+  status           String            @default("DISCOVERED")
+  
+  // Financial & Pricing
+  sellingPrice     Float             @default(0)
+  trueCost         Float             @default(0)
+  estimatedProfit  Float             @default(0)
+  targetMargin     Float             @default(35) // Percentage
+  minPrice         Float             @default(0)
+  maxPrice         Float             @default(0)
+  
+  // Shopify Link
+  shopifyProductId String?           @unique
+  shopifyHandle    String?
+  shopifyStatus    String            @default("draft") // draft, active, archived
+  
+  images           String?           // Comma or JSON array of image URLs
+  
+  // Relationships
+  variants         ProductVariant[]
+  score            ProductScore?
+  content          ProductContent?
+  supplierProducts SupplierProduct[]
+  orderItems       OrderItem[]
+  marketplace      MarketplaceListing?
+  
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model ProductVariant {
+  id                String   @id @default(cuid())
+  productId         String
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title             String   @default("Default Title")
+  sku               String?  @unique
+  price             Float
+  compareAtPrice    Float?
+  inventoryQuantity Int      @default(0)
+  shopifyVariantId  String?  @unique
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ProductScore {
+  id                   String   @id @default(cuid())
+  productId            String   @unique
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // 6 Criteria Model
+  demandScore          Float    @default(0) // max 25
+  competitionScore     Float    @default(0) // max 20
+  supplierScore        Float    @default(0) // max 20
+  marginScore          Float    @default(0) // max 20
+  shippingScore        Float    @default(0) // max 10
+  creativeScore        Float    @default(0) // max 5
+  totalScore           Float    @default(0) // max 100
+  
+  // Assessment: Candidate, Testing, Promising, Validated, Rejected
+  ratingCategory       String   @default("Candidate")
+  reasoning            String?
+  evaluatedAt          DateTime @default(now())
+}
+
+model ProductContent {
+  id               String   @id @default(cuid())
+  productId        String   @unique
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  // AI Copy Package
+  hook1            String?
+  hook2            String?
+  hook3            String?
+  headline         String?
+  primaryText      String?
+  videoScript      String?
+  bulletFeatures   String?  // JSON or Markdown
+  faqJson          String?
+  seoTitle         String?
+  seoDescription   String?
+  
+  // Policy Safeguard
+  compliancePassed Boolean  @default(true)
+  complianceNotes  String?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Supplier {
+  id                 String            @id @default(cuid())
+  companyName        String
+  contactPerson      String?
+  phone              String?
+  whatsapp           String?
+  email              String?
+  location           String?
+  indiamartUrl       String?
+  gstNumber          String?
+  rating             Float             @default(4.0)
+  
+  // Status: UNVERIFIED, CONTACTED, SAMPLE_ORDERED, VERIFIED, REJECTED
+  verificationStatus String            @default("UNVERIFIED")
+  checklistJson      String?           // Serialized checklist verification state
+  notes              String?
+  
+  products           SupplierProduct[]
+  supplierOrders     SupplierOrder[]
+  
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+model SupplierProduct {
+  id            String   @id @default(cuid())
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  supplierSku   String?
+  title         String
+  unitCost      Float    @default(0)
+  moq           Int      @default(1)
+  shippingCost  Float    @default(0)
+  packagingCost Float    @default(0)
+  leadTimeDays  Int      @default(3)
+  inStock       Boolean  @default(true)
+  stockCount    Int      @default(100)
+  productUrl    String?
+  
+  lastSyncedAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([supplierId, productId])
+}
+
+model Order {
+  id                String          @id @default(cuid())
+  shopifyOrderId    String?         @unique
+  orderNumber       String          @unique
+  customerName      String
+  customerEmail     String?
+  customerPhone     String?
+  shippingAddress   String?         // Formatted JSON or text
+  
+  totalPrice        Float           @default(0)
+  subtotalPrice     Float           @default(0)
+  taxPrice          Float           @default(0)
+  shippingFee       Float           @default(0)
+  currency          String          @default("INR")
+  
+  // Financial status: pending, paid, refunded, voided
+  financialStatus   String          @default("paid")
+  // Fulfillment status: unfulfilled, partial, fulfilled
+  fulfillmentStatus String          @default("unfulfilled")
+  paymentMethod     String          @default("COD") // COD, Prepaid, UPI, Card
+  notes             String?
+  
+  items             OrderItem[]
+  supplierOrders    SupplierOrder[]
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId  String?
+  
+  title      String
+  sku        String?
+  quantity   Int      @default(1)
+  unitPrice  Float    @default(0)
+  totalPrice Float    @default(0)
+}
+
+model SupplierOrder {
+  id               String    @id @default(cuid())
+  orderId          String
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId       String
+  supplier         Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  
+  supplierOrderRef String?   // Supplier internal reference or invoice #
+  
+  // State Machine: AWAITING_SUPPLIER, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, EXCEPTION, CANCELLED
+  status           String    @default("AWAITING_SUPPLIER")
+  purchaseCost     Float     @default(0)
+  
+  // Tracking
+  trackingNumber   String?
+  courierName      String?
+  trackingUrl      String?
+  
+  dispatchedAt     DateTime?
+  deliveredAt      DateTime?
+  notes            String?
+  exceptionReason  String?
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model MarketplaceListing {
+  id                 String   @id @default(cuid())
+  productId          String   @unique
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  preparedTitle      String
+  preparedPrice      Float
+  preparedDescription String
+  category           String?
+  imagesJson         String?
+  
+  // Assistant Review
+  complianceChecked  Boolean  @default(true)
+  approvalStatus     String   @default("PENDING_REVIEW") // PENDING_REVIEW, APPROVED, REJECTED, PUBLISHED
+  listingId          String?  // External Meta ID
+  impressions        Int      @default(0)
+  messagesCount      Int      @default(0)
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Campaign {
+  id             String   @id @default(cuid())
+  metaCampaignId String?  @unique
+  name           String
+  objective      String   @default("OUTCOME_SALES")
+  status         String   @default("ACTIVE") // ACTIVE, PAUSED, ARCHIVED
+  dailyBudget    Float    @default(0)
+  spend          Float    @default(0)
+  roas           Float    @default(0)
+  conversions    Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DailyMetric {
+  id                 String   @id @default(cuid())
+  date               String   @unique // YYYY-MM-DD
+  revenue            Float    @default(0)
+  ordersCount        Int      @default(0)
+  adSpend            Float    @default(0)
+  trueCost           Float    @default(0)
+  contributionProfit Float    @default(0)
+  roas               Float    @default(0)
+  aov                Float    @default(0)
+  refundCount        Int      @default(0)
+  refundAmount       Float    @default(0)
+  createdAt          DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  action      String
+  performedBy String   @default("SYSTEM")
+  detailsJson String?
+  createdAt   DateTime @default(now())
+}
