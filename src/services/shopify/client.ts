@@ -24,15 +24,58 @@ export interface ShopifyFulfillmentInput {
 export class ShopifyClient {
   private storeDomain: string;
   private accessToken: string;
+  private clientId: string;
+  private clientSecret: string;
   private apiVersion: string;
   private isMock: boolean;
+  private tokenExpiresAt: number = 0;
 
   constructor() {
     this.storeDomain = process.env.SHOPIFY_STORE_DOMAIN || "demo-dropship.myshopify.com";
     this.accessToken = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || "";
+    this.clientId = process.env.SHOPIFY_CLIENT_ID || "";
+    this.clientSecret = process.env.SHOPIFY_CLIENT_SECRET || process.env.SHOPIFY_WEBHOOK_SECRET || "";
     this.apiVersion = process.env.SHOPIFY_API_VERSION || "2025-01";
-    this.isMock = process.env.MOCK_MODE === "true" || !this.accessToken;
+    this.isMock =
+      process.env.MOCK_MODE === "true" ||
+      (!this.accessToken && !this.clientId);
   }
+
+  /**
+   * Retrieves a valid Shopify Admin API access token, automatically refreshing via Client Credentials
+   */
+  public async getAccessToken(): Promise<string> {
+    if (this.accessToken && !this.clientId) {
+      return this.accessToken;
+    }
+    const now = Date.now();
+    if (this.accessToken && this.tokenExpiresAt > now + 60000) {
+      return this.accessToken;
+    }
+    if (this.clientId && this.clientSecret) {
+      try {
+        const res = await fetch(`https://${this.storeDomain}/admin/oauth/access_token`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            grant_type: "client_credentials",
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          this.accessToken = data.access_token;
+          this.tokenExpiresAt = Date.now() + (data.expires_in || 86400) * 1000;
+          return this.accessToken;
+        }
+      } catch (err) {
+        console.error("Failed to exchange Shopify client credentials for token:", err);
+      }
+    }
+    return this.accessToken;
+  }
+
 
   /**
    * Verify HMAC signature on incoming webhooks from Shopify
@@ -108,11 +151,12 @@ export class ShopifyClient {
       },
     };
 
+    const token = await this.getAccessToken();
     const res = await fetch(`https://${this.storeDomain}/admin/api/${this.apiVersion}/graphql.json`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Shopify-Access-Token": this.accessToken,
+        "X-Shopify-Access-Token": token,
       },
       body: JSON.stringify({ query, variables }),
     });
