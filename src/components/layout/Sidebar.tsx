@@ -30,11 +30,18 @@ const navigation = [
     ],
   },
   {
-    title: "AI & INTELLIGENCE",
+    title: "MARKETING & AI",
     items: [
       { name: "Landed Cost Calculator", href: "/calculator", icon: Calculator },
-      { name: "Meta Creative Suite", href: "/marketing/creatives", icon: Megaphone },
+      { name: "Meta Campaigns", href: "/marketing/meta", icon: Megaphone },
+      { name: "Creative Suite", href: "/marketing/creatives", icon: Sparkles },
       { name: "Marketplace Assistant", href: "/marketing/marketplace", icon: Store },
+    ],
+  },
+  {
+    title: "ANALYTICS",
+    items: [
+      { name: "Profitability Analytics", href: "/analytics", icon: Layers },
     ],
   },
   {
